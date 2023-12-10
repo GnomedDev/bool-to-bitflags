@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Cargo test
+        run: cargo test --all-features
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Run Cargo clippy on all feature combinations
+        run: cargo hack clippy --feature-powerset -- --deny warnings

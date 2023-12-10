@@ -1,0 +1,198 @@
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote, ToTokens};
+use syn::{Field, Fields, Ident, Token};
+
+use crate::{
+    derive_hijack::{hijack_derives, HijackOutput},
+    error::Error,
+    field_to_flag_name,
+    strip_spans::strip_spans,
+};
+
+fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
+    Field {
+        attrs: Vec::new(),
+        ident: Some(field_ident),
+        vis: syn::Visibility::Inherited,
+        mutability: syn::FieldMutability::None,
+        colon_token: Some(<Token![:]>::default()),
+        ty: syn::Type::Path(syn::TypePath {
+            qself: None,
+            path: syn::Path {
+                leading_colon: None,
+                segments: [syn::PathSegment {
+                    ident: flags_ident,
+                    arguments: syn::PathArguments::None,
+                }]
+                .into_iter()
+                .collect(),
+            },
+        }),
+    }
+}
+
+fn is_bool_field(bool_fields: &mut Vec<Field>) -> impl FnMut(&Field) -> bool + '_ {
+    let bool_ident = Ident::new("bool", Span::call_site());
+    move |field| {
+        if let syn::Type::Path(ty) = &field.ty {
+            let segments = &ty.path.segments;
+            if segments.first().is_some_and(|seg| seg.ident == bool_ident) {
+                bool_fields.push(field.clone());
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+fn extract_bool_fields(flag_field: Field, fields: Fields) -> Result<(Fields, Vec<Field>), Error> {
+    let Fields::Named(mut fields) = fields else {
+        return Err(Error::Custom(
+            Span::call_site(),
+            "Only structs with named fields are supported!",
+        ));
+    };
+
+    let mut bool_fields = Vec::new();
+    fields.named = fields
+        .named
+        .into_iter()
+        .filter(is_bool_field(&mut bool_fields))
+        .chain(std::iter::once(flag_field))
+        .collect();
+
+    Ok((Fields::Named(fields), bool_fields))
+}
+
+fn get_flag_size(bool_count: usize) -> TokenStream {
+    match bool_count {
+        0..=8 => quote!(u8),
+        9..=16 => quote!(u16),
+        17..=32 => quote!(u32),
+        33..=64 => quote!(u64),
+        65..=128 => quote!(u128),
+        _ => panic!("Cannot fit {bool_count} bool fields into single bitflags type!"),
+    }
+}
+
+fn generate_bitflags_type(
+    flags_name: &Ident,
+    bool_fields: &[Field],
+    flags_derives: Vec<TokenStream>,
+) -> TokenStream {
+    let flags_size = get_flag_size(bool_fields.len());
+    let flag_values = (0..bool_fields.len())
+        .map(|i| (1 << i).to_string())
+        .map(|i| syn::LitInt::new(&i, Span::call_site()));
+
+    let flag_names = bool_fields
+        .iter()
+        .map(|f| f.ident.as_ref().unwrap())
+        .map(field_to_flag_name);
+
+    quote!(bitflags::bitflags! {
+        #(#flags_derives)*
+        struct #flags_name: #flags_size {
+            #(
+                const #flag_names = #flag_values;
+            )*
+        }
+    })
+}
+
+fn generate_getters_setters(
+    struct_item: &syn::ItemStruct,
+    flags_name: Ident,
+    flag_field: Ident,
+    bool_fields: &[Field],
+) -> TokenStream {
+    let struct_name = &struct_item.ident;
+    let (impl_generics, ty_generics, where_clause) = struct_item.generics.split_for_impl();
+
+    let mut impl_body = TokenStream::new();
+    for field in bool_fields {
+        let field_vis = &field.vis;
+        let field_docs = &field.attrs;
+        let field_name = field.ident.as_ref().unwrap();
+        let flag_name = field_to_flag_name(field_name);
+
+        let setter_name = format_ident!("set_{field_name}");
+        let setter_docs = format!("Sets the {field_name} to the value provided.");
+
+        impl_body.extend([quote!(
+            #(#field_docs)*
+            #field_vis fn #field_name(&self) -> bool {
+                self.#flag_field.contains(#flags_name::#flag_name)
+            }
+
+            #[doc = #setter_docs]
+            #field_vis fn #setter_name(&mut self, value: bool) {
+                self.#flag_field.set(#flags_name::#flag_name, value);
+            }
+        )])
+    }
+
+    quote!(
+        impl #impl_generics #struct_name #ty_generics #where_clause {
+            #impl_body
+        }
+    )
+}
+
+pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenStream, Error> {
+    // Hidden flags type should not have the span of the struct's name.
+    let flags_name = format_ident!("{}Flags", struct_item.ident, span = Span::call_site());
+    let flag_field_name = Ident::new("__generated_flags", Span::call_site());
+    let original_mod_name = format_ident!(
+        "__generated_bool_to_bitflags_{}",
+        struct_item.ident,
+        // Hidden mod should not have the span of the struct's name.
+        span = Span::call_site()
+    );
+
+    let mut original_struct = struct_item.clone();
+    original_struct.vis = syn::parse2(quote!(pub(super)))?;
+    strip_spans(&mut original_struct);
+
+    let flag_field = generate_flag_field(flags_name.clone(), flag_field_name.clone());
+    let (fields, bool_fields) = extract_bool_fields(flag_field, struct_item.fields)?;
+    struct_item.fields = fields;
+
+    let HijackOutput {
+        mut compacted_struct_attrs,
+        from_into_impls,
+        flags_derives,
+    } = hijack_derives(
+        &mut struct_item,
+        &flag_field_name,
+        &original_mod_name,
+        &flags_name,
+        &bool_fields,
+    )?;
+
+    compacted_struct_attrs = struct_item
+        .attrs
+        .drain(..)
+        .map(|a| a.to_token_stream())
+        .chain(compacted_struct_attrs)
+        .collect();
+
+    let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
+    let func_impls =
+        generate_getters_setters(&struct_item, flags_name, flag_field_name, &bool_fields);
+
+    Ok(quote!(
+        mod #original_mod_name {
+            use super::*;
+
+            #original_struct
+            #from_into_impls
+        }
+
+        #bitflags_def
+        #(#compacted_struct_attrs)*
+        #struct_item
+        #func_impls
+    ))
+}
