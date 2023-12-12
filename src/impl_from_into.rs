@@ -71,8 +71,8 @@ pub fn impl_into(
         impl #impl_generics Into<#struct_name #ty_generics> for super::#struct_name #ty_generics #where_clause {
             fn into(self) -> #struct_name #ty_generics {
                 #struct_name {
-                    #(#passthrough_fields,)*
                     #(#bool_fields,)*
+                    #(#passthrough_fields,)*
                 }
             }
         }
