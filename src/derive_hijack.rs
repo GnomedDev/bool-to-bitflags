@@ -79,7 +79,6 @@ pub fn hijack_derives(
     let mut serde_from = None;
     let mut serde_into = None;
     let mut new_attrs = Vec::new();
-    let mut compacted_attrs = Vec::new();
     for attr in &compacted_struct.attrs {
         if attr.path().is_ident("derive") {
             let parser = Punctuated::<Path, Token![,]>::parse_terminated;
@@ -99,12 +98,15 @@ pub fn hijack_derives(
         new_attrs.push(attr.to_token_stream())
     }
 
-    if serde_from.is_some() {
-        compacted_attrs.push(quote!(#[serde(from = #original_path)]));
-    }
-    if serde_into.is_some() {
-        compacted_attrs.push(quote!(#[serde(into = #original_path)]));
-    }
+    let add_from_attr = serde_from.is_some();
+    let add_into_attr = serde_into.is_some();
+    let compacted_attrs = compacted_struct
+        .attrs
+        .drain(..)
+        .map(|a| a.to_token_stream())
+        .chain(add_from_attr.then(|| quote!(#[serde(from = #original_path)])))
+        .chain(add_into_attr.then(|| quote!(#[serde(into = #original_path)])))
+        .collect();
 
     Ok(HijackOutput {
         from_into_impls: quote!(#serde_from #serde_into),

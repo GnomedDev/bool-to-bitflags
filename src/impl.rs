@@ -1,5 +1,5 @@
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote};
 use syn::{Field, Fields, Ident, Token};
 
 use crate::{
@@ -160,7 +160,7 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
     struct_item.fields = fields;
 
     let HijackOutput {
-        mut compacted_struct_attrs,
+        compacted_struct_attrs,
         from_into_impls,
         flags_derives,
     } = hijack_derives(
@@ -170,13 +170,6 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
         &flags_name,
         &bool_fields,
     )?;
-
-    compacted_struct_attrs = struct_item
-        .attrs
-        .drain(..)
-        .map(|a| a.to_token_stream())
-        .chain(compacted_struct_attrs)
-        .collect();
 
     let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
     let func_impls =
