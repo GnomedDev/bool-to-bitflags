@@ -94,11 +94,13 @@ fn generate_bitflags_type(
     quote!(bitflags::bitflags! {
         #(#flags_derives)*
         struct #flags_name: #flags_size {
-            #(
-                const #flag_names = #flag_values;
-            )*
+            #(const #flag_names = #flag_values;)*
         }
     })
+}
+
+fn extract_docs(attrs: &[syn::Attribute]) -> impl Iterator<Item = &syn::Attribute> {
+    attrs.iter().filter(|attr| attr.path().is_ident("doc"))
 }
 
 fn generate_getters_setters(
@@ -113,7 +115,7 @@ fn generate_getters_setters(
     let mut impl_body = TokenStream::new();
     for field in bool_fields {
         let field_vis = &field.vis;
-        let field_docs = &field.attrs;
+        let field_docs = extract_docs(&field.attrs);
         let field_name = field.ident.as_ref().unwrap();
         let flag_name = field_to_flag_name(field_name);
 
