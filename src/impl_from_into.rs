@@ -38,11 +38,7 @@ pub fn impl_from(
                     #(#passthrough_fields,)*
                     #flag_field_name: {
                         let mut flags = super::#flags_name::empty();
-                        #(
-                            if value.#bool_fields {
-                                flags |= super::#flags_name::#bool_fields_upper;
-                            }
-                        )*
+                        #(flags.set(super::#flags_name::#bool_fields_upper, value.#bool_fields);)*
                         flags
                     }
                 }
