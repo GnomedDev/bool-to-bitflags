@@ -6,6 +6,7 @@ use crate::{
     derive_hijack::{hijack_derives, HijackOutput},
     error::Error,
     field_to_flag_name,
+    impl_from_into::{impl_from, impl_into},
     strip_spans::strip_spans,
 };
 
@@ -163,15 +164,11 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
 
     let HijackOutput {
         compacted_struct_attrs,
-        from_into_impls,
         flags_derives,
-    } = hijack_derives(
-        &mut struct_item,
-        &flag_field_name,
-        &original_mod_name,
-        &flags_name,
-        &bool_fields,
-    )?;
+    } = hijack_derives(&mut struct_item, &original_mod_name)?;
+
+    let from_impl = impl_from(&struct_item, &flag_field_name, &flags_name, &bool_fields);
+    let into_impl = impl_into(&struct_item, &flag_field_name, &bool_fields);
 
     let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
     let func_impls =
@@ -182,7 +179,8 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
             use super::*;
 
             #original_struct
-            #from_into_impls
+            #from_impl
+            #into_impl
         }
 
         #bitflags_def
