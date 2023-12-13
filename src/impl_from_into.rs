@@ -14,6 +14,7 @@ fn extract_fields(fields: &Fields) -> &Punctuated<Field, Token![,]> {
 
 pub fn impl_from(
     struct_item: &ItemStruct,
+    original_struct_name: &Ident,
     flag_field_name: &Ident,
     flags_name: &Ident,
     bool_fields: &[Field],
@@ -32,13 +33,13 @@ pub fn impl_from(
     let bool_fields_upper = bool_fields.clone().map(field_to_flag_name);
 
     quote!(
-        impl #impl_generics From<#struct_name #ty_generics> for super::#struct_name #ty_generics #where_clause {
-            fn from(value: #struct_name #ty_generics) -> Self {
+        impl #impl_generics From<#original_struct_name #ty_generics> for #struct_name #ty_generics #where_clause {
+            fn from(value: #original_struct_name #ty_generics) -> Self {
                 Self {
                     #(#passthrough_fields,)*
                     #flag_field_name: {
-                        let mut flags = super::#flags_name::empty();
-                        #(flags.set(super::#flags_name::#bool_fields_upper, value.#bool_fields);)*
+                        let mut flags = #flags_name::empty();
+                        #(flags.set(#flags_name::#bool_fields_upper, value.#bool_fields);)*
                         flags
                     }
                 }
@@ -49,6 +50,7 @@ pub fn impl_from(
 
 pub fn impl_into(
     struct_item: &ItemStruct,
+    original_struct_name: &Ident,
     flag_field_name: &Ident,
     bool_fields: &[Field],
 ) -> TokenStream {
@@ -68,9 +70,9 @@ pub fn impl_into(
         .map(|ident| quote!(#ident: self.#ident()));
 
     quote!(
-        impl #impl_generics Into<#struct_name #ty_generics> for super::#struct_name #ty_generics #where_clause {
-            fn into(self) -> #struct_name #ty_generics {
-                #struct_name {
+        impl #impl_generics Into<#original_struct_name #ty_generics> for #struct_name #ty_generics #where_clause {
+            fn into(self) -> #original_struct_name #ty_generics {
+                #original_struct_name {
                     #(#bool_fields,)*
                     #(#passthrough_fields,)*
                 }

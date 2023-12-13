@@ -147,15 +147,9 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
     // Hidden flags type should not have the span of the struct's name.
     let flags_name = format_ident!("{}Flags", struct_item.ident, span = Span::call_site());
     let flag_field_name = Ident::new("__generated_flags", Span::call_site());
-    let original_mod_name = format_ident!(
-        "__generated_bool_to_bitflags_{}",
-        struct_item.ident,
-        // Hidden mod should not have the span of the struct's name.
-        span = Span::call_site()
-    );
 
     let mut original_struct = struct_item.clone();
-    original_struct.vis = syn::parse2(quote!(pub(super)))?;
+    original_struct.ident = format_ident!("{}Original", original_struct.ident);
     strip_spans(&mut original_struct);
 
     let flag_field = generate_flag_field(flags_name.clone(), flag_field_name.clone());
@@ -165,23 +159,31 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
     let HijackOutput {
         compacted_struct_attrs,
         flags_derives,
-    } = hijack_derives(&mut struct_item, &original_mod_name)?;
+    } = hijack_derives(&mut struct_item, &original_struct.ident)?;
 
-    let from_impl = impl_from(&struct_item, &flag_field_name, &flags_name, &bool_fields);
-    let into_impl = impl_into(&struct_item, &flag_field_name, &bool_fields);
+    let from_impl = impl_from(
+        &struct_item,
+        &original_struct.ident,
+        &flag_field_name,
+        &flags_name,
+        &bool_fields,
+    );
+
+    let into_impl = impl_into(
+        &struct_item,
+        &original_struct.ident,
+        &flag_field_name,
+        &bool_fields,
+    );
 
     let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
     let func_impls =
         generate_getters_setters(&struct_item, flags_name, flag_field_name, &bool_fields);
 
     Ok(quote!(
-        mod #original_mod_name {
-            use super::*;
-
-            #original_struct
-            #from_impl
-            #into_impl
-        }
+        #original_struct
+        #from_impl
+        #into_impl
 
         #bitflags_def
         #(#compacted_struct_attrs)*

@@ -12,11 +12,12 @@ fn new_basic_segment(ident: &'static str) -> syn::PathSegment {
 }
 
 fn set_custom_impls(
-    original_path: &str,
+    original_name: &Ident,
     serde_from: &mut Option<TokenStream>,
     serde_into: &mut Option<TokenStream>,
     derive_macros: Punctuated<Path, Token![,]>,
 ) -> Result<TokenStream, Error> {
+    let original_name = original_name.to_string();
     let serde_segment = new_basic_segment("serde");
     let serialize_segment = new_basic_segment("Serialize");
     let deserialize_segment = new_basic_segment("Deserialize");
@@ -39,9 +40,9 @@ fn set_custom_impls(
         };
 
         if next_segment == &serialize_segment {
-            *serde_into = Some(quote!(#[serde(into = #original_path)]));
+            *serde_into = Some(quote!(#[serde(into = #original_name)]));
         } else if next_segment == &deserialize_segment {
-            *serde_from = Some(quote!(#[serde(from = #original_path)]));
+            *serde_from = Some(quote!(#[serde(from = #original_name)]));
         } else {
             filtered_derives.push(path);
         }
@@ -57,10 +58,8 @@ pub struct HijackOutput {
 
 pub fn hijack_derives(
     compacted_struct: &mut ItemStruct,
-    original_mod_name: &Ident,
+    original_name: &Ident,
 ) -> Result<HijackOutput, Error> {
-    let original_path = format!("{original_mod_name}::{}", compacted_struct.ident);
-
     let mut serde_from = None;
     let mut serde_into = None;
     let mut new_attrs = Vec::new();
@@ -68,7 +67,7 @@ pub fn hijack_derives(
         if attr.path().is_ident("derive") {
             let parser = Punctuated::<Path, Token![,]>::parse_terminated;
             new_attrs.push(set_custom_impls(
-                &original_path,
+                original_name,
                 &mut serde_from,
                 &mut serde_into,
                 attr.parse_args_with(parser)?,
