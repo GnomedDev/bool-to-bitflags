@@ -84,6 +84,7 @@ pub fn hijack_derives(
     let compacted_attrs = compacted_struct
         .attrs
         .drain(..)
+        .filter(|a| !a.path().is_ident("serde"))
         .map(|a| a.to_token_stream())
         .chain(serde_from)
         .chain(serde_into)
