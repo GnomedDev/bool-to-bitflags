@@ -62,21 +62,17 @@ pub fn hijack_derives(
 ) -> Result<HijackOutput, Error> {
     let mut serde_from = None;
     let mut serde_into = None;
-    let mut new_attrs = Vec::new();
+    let mut flags_derives = Vec::new();
     for attr in &compacted_struct.attrs {
         if attr.path().is_ident("derive") {
             let parser = Punctuated::<Path, Token![,]>::parse_terminated;
-            new_attrs.push(set_custom_impls(
+            flags_derives.push(set_custom_impls(
                 original_name,
                 &mut serde_from,
                 &mut serde_into,
                 attr.parse_args_with(parser)?,
             )?);
-
-            continue;
         }
-
-        new_attrs.push(attr.to_token_stream())
     }
 
     let compacted_attrs = compacted_struct
@@ -89,6 +85,6 @@ pub fn hijack_derives(
 
     Ok(HijackOutput {
         compacted_struct_attrs: compacted_attrs,
-        flags_derives: new_attrs,
+        flags_derives,
     })
 }
