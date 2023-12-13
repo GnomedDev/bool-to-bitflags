@@ -92,12 +92,21 @@ fn generate_bitflags_type(
         .map(|f| f.ident.as_ref().unwrap())
         .map(field_to_flag_name);
 
-    quote!(bitflags::bitflags! {
-        #(#flags_derives)*
-        struct #flags_name: #flags_size {
-            #(const #flag_names = #flag_values;)*
+    #[cfg(feature = "typesize")]
+    let typesize_impl = Some(quote!(impl ::typesize::TypeSize for #flags_name {}));
+    #[cfg(not(feature = "typesize"))]
+    let typesize_impl: Option<TokenStream> = None;
+
+    quote!(
+        bitflags::bitflags! {
+            #(#flags_derives)*
+            struct #flags_name: #flags_size {
+                #(const #flag_names = #flag_values;)*
+            }
         }
-    })
+
+        #typesize_impl
+    )
 }
 
 fn extract_docs(attrs: &[syn::Attribute]) -> impl Iterator<Item = &syn::Attribute> {
@@ -181,6 +190,7 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
         generate_getters_setters(&struct_item, flags_name, flag_field_name, &bool_fields);
 
     Ok(quote!(
+        #[allow(clippy::struct_excessive_bools)]
         #original_struct
         #from_impl
         #into_impl

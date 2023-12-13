@@ -22,6 +22,10 @@ fn set_custom_impls(
     let serialize_segment = new_basic_segment("Serialize");
     let deserialize_segment = new_basic_segment("Deserialize");
 
+    let typesize_first_segment = new_basic_segment("typesize");
+    let typesize_derive_segment = new_basic_segment("derive");
+    let typesize_last_segment = new_basic_segment("TypeSize");
+
     let mut filtered_derives = Vec::new();
     for path in &derive_macros {
         let mut path_iter = path.segments.iter();
@@ -29,7 +33,7 @@ fn set_custom_impls(
             continue;
         };
 
-        if first_segment != &serde_segment {
+        if first_segment != &serde_segment && first_segment != &typesize_first_segment {
             filtered_derives.push(path);
             continue;
         }
@@ -43,7 +47,9 @@ fn set_custom_impls(
             *serde_into = Some(quote!(#[serde(into = #original_name)]));
         } else if next_segment == &deserialize_segment {
             *serde_from = Some(quote!(#[serde(from = #original_name)]));
-        } else {
+        } else if !(next_segment == &typesize_derive_segment
+            && path_iter.next() == Some(&typesize_last_segment))
+        {
             filtered_derives.push(path);
         }
     }
