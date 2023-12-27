@@ -14,6 +14,7 @@ quote = "1.0.33"
 syn = { version = "2.0.39", features = ["full", "extra-traits"] }
 
 procout = { version = "0.1.13", features = ["procout"], optional = true }
+darling = "0.20.3"
 
 [dev-dependencies]
 typesize = "0.1"

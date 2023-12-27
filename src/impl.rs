@@ -3,10 +3,12 @@ use quote::{format_ident, quote};
 use syn::{Field, Fields, Ident, Token};
 
 use crate::{
+    args::Args,
     derive_hijack::{hijack_derives, HijackOutput},
     error::Error,
     field_to_flag_name,
     impl_from_into::{impl_from, impl_into},
+    impl_get_set::generate_getters_setters,
     strip_spans::strip_spans,
 };
 
@@ -109,50 +111,12 @@ fn generate_bitflags_type(
     )
 }
 
-fn extract_docs(attrs: &[syn::Attribute]) -> impl Iterator<Item = &syn::Attribute> {
-    attrs.iter().filter(|attr| attr.path().is_ident("doc"))
-}
+pub fn bool_to_bitflags_impl(
+    args: TokenStream,
+    mut struct_item: syn::ItemStruct,
+) -> Result<TokenStream, Error> {
+    let args = Args::parse(args)?;
 
-fn generate_getters_setters(
-    struct_item: &syn::ItemStruct,
-    flags_name: Ident,
-    flag_field: Ident,
-    bool_fields: &[Field],
-) -> TokenStream {
-    let struct_name = &struct_item.ident;
-    let (impl_generics, ty_generics, where_clause) = struct_item.generics.split_for_impl();
-
-    let mut impl_body = TokenStream::new();
-    for field in bool_fields {
-        let field_vis = &field.vis;
-        let field_docs = extract_docs(&field.attrs);
-        let field_name = field.ident.as_ref().unwrap();
-        let flag_name = field_to_flag_name(field_name);
-
-        let setter_name = format_ident!("set_{field_name}");
-        let setter_docs = format!("Sets the {field_name} to the value provided.");
-
-        impl_body.extend([quote!(
-            #(#field_docs)*
-            #field_vis fn #field_name(&self) -> bool {
-                self.#flag_field.contains(#flags_name::#flag_name)
-            }
-
-            #[doc = #setter_docs]
-            #field_vis fn #setter_name(&mut self, value: bool) {
-                self.#flag_field.set(#flags_name::#flag_name, value);
-            }
-        )])
-    }
-
-    quote!(
-        impl #impl_generics #struct_name #ty_generics #where_clause {
-            #impl_body
-        }
-    )
-}
-
-pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenStream, Error> {
     // Hidden flags type should not have the span of the struct's name.
     let flags_name = format_ident!("{}Flags", struct_item.ident, span = Span::call_site());
     let flag_field_name = Ident::new("__generated_flags", Span::call_site());
@@ -182,12 +146,18 @@ pub fn bool_to_bitflags_impl(mut struct_item: syn::ItemStruct) -> Result<TokenSt
         &struct_item,
         &original_struct.ident,
         &flag_field_name,
+        &flags_name,
         &bool_fields,
     );
 
     let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
-    let func_impls =
-        generate_getters_setters(&struct_item, flags_name, flag_field_name, &bool_fields);
+    let func_impls = generate_getters_setters(
+        &struct_item,
+        flags_name,
+        flag_field_name,
+        &bool_fields,
+        args,
+    );
 
     Ok(quote!(
         #[allow(clippy::struct_excessive_bools)]

@@ -52,6 +52,7 @@ pub fn impl_into(
     struct_item: &ItemStruct,
     original_struct_name: &Ident,
     flag_field_name: &Ident,
+    flags_name: &Ident,
     bool_fields: &[Field],
 ) -> TokenStream {
     let struct_name = &struct_item.ident;
@@ -66,8 +67,8 @@ pub fn impl_into(
 
     let bool_fields = bool_fields
         .iter()
-        .map(|f| &f.ident)
-        .map(|ident| quote!(#ident: self.#ident()));
+        .map(|f| (&f.ident, f.ident.as_ref().map(field_to_flag_name)))
+        .map(|(field_name, flag_name)| quote!(#field_name: self.#flag_field_name.contains(#flags_name::#flag_name)));
 
     quote!(
         impl #impl_generics Into<#original_struct_name #ty_generics> for #struct_name #ty_generics #where_clause {
