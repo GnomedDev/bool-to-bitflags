@@ -4,8 +4,9 @@ use syn::Field;
 
 use crate::{args::Args, field_to_flag_name};
 
-fn extract_docs(attrs: &[syn::Attribute]) -> impl Iterator<Item = &syn::Attribute> + Clone {
-    attrs.iter().filter(|attr| attr.path().is_ident("doc"))
+fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
+    let attrs = attrs.iter().filter(|attr| attr.path().is_ident("doc"));
+    quote!(#(#attrs)*)
 }
 
 fn args_to_names(args: &Args, field_name: &Ident) -> (Ident, Ident) {
@@ -43,15 +44,20 @@ pub fn generate_getters_setters(
         };
 
         let (getter_name, setter_name) = args_to_names(&args, field_name);
-        let setter_docs = format!("Sets the {field_name} to the value provided.");
+        let (getter_docs, setter_docs) = if args.document_setters {
+            (TokenStream::default(), field_docs)
+        } else {
+            let setter_docs = format!("Sets the {field_name} to the value provided.");
+            (field_docs, quote!(#[doc = #setter_docs]))
+        };
 
         impl_body.extend([quote!(
-            #(#field_docs)*
+            #getter_docs
             #getter_vis fn #getter_name(&self) -> bool {
                 self.#flag_field.contains(#flags_name::#flag_name)
             }
 
-            #[doc = #setter_docs]
+            #setter_docs
             #setter_vis fn #setter_name(&mut self, value: bool) {
                 self.#flag_field.set(#flags_name::#flag_name, value);
             }
