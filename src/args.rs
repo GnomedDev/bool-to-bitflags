@@ -9,6 +9,8 @@ pub struct Args {
     pub getter_prefix: Option<String>,
     pub setter_prefix: Option<String>,
     #[darling(default)]
+    pub private_getters: bool,
+    #[darling(default)]
     pub private_setters: bool,
     #[darling(default)]
     pub document_setters: bool,

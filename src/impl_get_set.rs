@@ -9,6 +9,14 @@ fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
     quote!(#(#attrs)*)
 }
 
+fn handle_visibility_arg(field_vis: &syn::Visibility, private: bool) -> &syn::Visibility {
+    if private {
+        &syn::Visibility::Inherited
+    } else {
+        field_vis
+    }
+}
+
 fn args_to_names(args: &Args, field_name: &Ident) -> (Ident, Ident) {
     let getter_prefix = args.getter_prefix.as_deref().unwrap_or("");
     let setter_prefix = args.setter_prefix.as_deref().unwrap_or("set_");
@@ -36,12 +44,8 @@ pub fn generate_getters_setters(
         let field_name = field.ident.as_ref().unwrap();
         let flag_name = field_to_flag_name(field_name);
 
-        let getter_vis = &field.vis;
-        let setter_vis = if args.private_setters {
-            &syn::Visibility::Inherited
-        } else {
-            getter_vis
-        };
+        let getter_vis = handle_visibility_arg(&field.vis, args.private_getters);
+        let setter_vis = handle_visibility_arg(&field.vis, args.private_setters);
 
         let (getter_name, setter_name) = args_to_names(&args, field_name);
         let (getter_docs, setter_docs) = if args.document_setters {
