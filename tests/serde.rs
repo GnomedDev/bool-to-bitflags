@@ -9,7 +9,7 @@ struct Test {
 fn serde() {
     let example_json = "{\"works\":true}";
     let example: Test = serde_json::from_str(example_json).unwrap();
-    assert_eq!(example, TestOriginal { works: true }.into());
+    assert_eq!(example, TestGeneratedOriginal { works: true }.into());
 
     let serialized_example = serde_json::to_string(&example).unwrap();
     assert_eq!(serialized_example, example_json);
@@ -22,7 +22,7 @@ struct TestRemote {
     to_invert: bool,
 }
 
-impl<'de> serde::Deserialize<'de> for TestRemoteOriginal {
+impl<'de> serde::Deserialize<'de> for TestRemoteGeneratedOriginal {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let mut test = Self::deserialize(deserializer)?;
         test.to_invert = !test.to_invert;

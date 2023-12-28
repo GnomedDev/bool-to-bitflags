@@ -127,11 +127,15 @@ pub fn bool_to_bitflags_impl(
     let args = Args::parse(args)?;
 
     // Hidden flags type should not have the span of the struct's name.
-    let flags_name = format_ident!("{}Flags", struct_item.ident, span = Span::call_site());
     let flag_field_name = Ident::new("__generated_flags", Span::call_site());
+    let flags_name = format_ident!(
+        "{}GeneratedFlags",
+        struct_item.ident,
+        span = Span::call_site()
+    );
 
     let mut original_struct = struct_item.clone();
-    original_struct.ident = format_ident!("{}Original", original_struct.ident);
+    original_struct.ident = format_ident!("{}GeneratedOriginal", original_struct.ident);
     strip_spans(&mut original_struct);
 
     let flag_field = generate_flag_field(flags_name.clone(), flag_field_name.clone());
