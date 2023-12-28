@@ -2,11 +2,10 @@ use std::borrow::Cow;
 
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
-use syn::Field;
 
 use crate::{
     args::Args,
-    r#impl::{field_to_flag_name, generate_pub_crate},
+    r#impl::{generate_pub_crate, BoolField},
 };
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
@@ -33,11 +32,31 @@ fn args_to_names(args: &Args, field_name: &Ident) -> (Ident, Ident) {
     )
 }
 
+pub fn generate_getter_body(
+    field: &BoolField,
+    flag_field: &Ident,
+    flags_name: &Ident,
+) -> TokenStream {
+    let flag_name = &field.flag_ident;
+    match field {
+        BoolField::Normal(..) => quote!(self.#flag_field.contains(#flags_name::#flag_name)),
+        BoolField::Opt {
+            tag_bit_flag_ident, ..
+        } => quote!(
+            if self.#flag_field.contains(#flags_name::#tag_bit_flag_ident) {
+                Some(self.#flag_field.contains(#flags_name::#flag_name))
+            } else {
+                None
+            }
+        ),
+    }
+}
+
 pub fn generate_getters_setters(
     struct_item: &syn::ItemStruct,
     flags_name: Ident,
     flag_field: Ident,
-    bool_fields: &[Field],
+    bool_fields: &[BoolField],
     args: Args,
 ) -> TokenStream {
     let struct_name = &struct_item.ident;
@@ -46,8 +65,8 @@ pub fn generate_getters_setters(
     let mut impl_body = TokenStream::new();
     for field in bool_fields {
         let field_docs = extract_docs(&field.attrs);
-        let field_name = field.ident.as_ref().unwrap();
-        let flag_name = field_to_flag_name(field_name);
+        let field_name = &field.field_ident;
+        let flag_name = &field.flag_ident;
 
         let getter_vis = handle_visibility_arg(&field.vis, args.private_getters);
         let setter_vis = handle_visibility_arg(&field.vis, args.private_setters);
@@ -60,17 +79,40 @@ pub fn generate_getters_setters(
             (field_docs, quote!(#[doc = #setter_docs]))
         };
 
-        impl_body.extend([quote!(
-            #getter_docs
-            #getter_vis fn #getter_name(&self) -> bool {
-                self.#flag_field.contains(#flags_name::#flag_name)
-            }
+        let getter_body = generate_getter_body(field, &flag_field, &flags_name);
+        let to_extend = match field {
+            BoolField::Normal(_) => quote!(
+                #getter_docs
+                #getter_vis fn #getter_name(&self) -> bool {
+                    #getter_body
+                }
 
-            #setter_docs
-            #setter_vis fn #setter_name(&mut self, value: bool) {
-                self.#flag_field.set(#flags_name::#flag_name, value);
-            }
-        )]);
+                #setter_docs
+                #setter_vis fn #setter_name(&mut self, value: bool) {
+                    self.#flag_field.set(#flags_name::#flag_name, value);
+                }
+            ),
+            BoolField::Opt {
+                tag_bit_flag_ident, ..
+            } => quote!(
+                #getter_docs
+                #getter_vis fn #getter_name(&self) -> Option<bool> {
+                    #getter_body
+                }
+
+                #setter_docs
+                #setter_vis fn #setter_name(&mut self, value: Option<bool>) {
+                    if let Some(value) = value {
+                        self.#flag_field.insert(#flags_name::#tag_bit_flag_ident);
+                        self.#flag_field.set(#flags_name::#flag_name, value);
+                    } else {
+                        self.#flag_field.remove(#flags_name::#tag_bit_flag_ident);
+                    }
+                }
+            ),
+        };
+
+        impl_body.extend([to_extend])
     }
 
     quote!(

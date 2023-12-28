@@ -13,10 +13,60 @@ use crate::{
     strip_spans::strip_spans,
 };
 
-pub fn field_to_flag_name(ident: &Ident) -> Ident {
-    // Purposefully does not use field ident for flag name, to prevent flag
-    // showing up in documentation/rust-analyzer hints
-    Ident::new(&ident.to_string().to_uppercase(), Span::call_site())
+pub struct BoolFieldInner {
+    pub field_ident: Ident,
+    pub flag_ident: Ident,
+    pub attrs: Vec<syn::Attribute>,
+    pub vis: syn::Visibility,
+}
+
+pub enum BoolField {
+    Normal(BoolFieldInner),
+    Opt {
+        bool_bit: BoolFieldInner,
+        tag_bit_flag_ident: Ident,
+    },
+}
+
+impl BoolField {
+    fn from_field(field: &Field) -> Self {
+        let field_ident = field.ident.clone().unwrap();
+        BoolField::Normal(BoolFieldInner {
+            flag_ident: Ident::new(&field_ident.to_string().to_uppercase(), Span::call_site()),
+            attrs: field.attrs.clone(),
+            vis: field.vis.clone(),
+            field_ident,
+        })
+    }
+
+    fn from_opt_bool_field(field: &Field) -> Self {
+        match Self::from_field(field) {
+            BoolField::Opt { .. } => unreachable!(),
+            BoolField::Normal(bool_bit) => BoolField::Opt {
+                tag_bit_flag_ident: format_ident!("{}_OPT_TAG", bool_bit.flag_ident),
+                bool_bit,
+            },
+        }
+    }
+
+    pub fn tag_bit_flag_ident(&self) -> Option<&Ident> {
+        match self {
+            BoolField::Normal(_) => None,
+            BoolField::Opt {
+                tag_bit_flag_ident, ..
+            } => Some(tag_bit_flag_ident),
+        }
+    }
+}
+
+impl std::ops::Deref for BoolField {
+    type Target = BoolFieldInner;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            BoolField::Normal(inner) => inner,
+            BoolField::Opt { bool_bit, .. } => bool_bit,
+        }
+    }
 }
 
 pub fn path_from_ident(ident: Ident) -> syn::Path {
@@ -55,22 +105,44 @@ fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
     }
 }
 
-fn is_bool_field(bool_fields: &mut Vec<Field>) -> impl FnMut(&Field) -> bool + '_ {
+fn generate_generic(ty: syn::Type) -> syn::PathArguments {
+    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+        colon2_token: None,
+        lt_token: <Token![<]>::default(),
+        args: [syn::GenericArgument::Type(ty)].into_iter().collect(),
+        gt_token: <Token![>]>::default(),
+    })
+}
+
+fn is_bool_field(bool_fields: &mut Vec<BoolField>) -> impl FnMut(&Field) -> bool + '_ {
     let bool_ident = Ident::new("bool", Span::call_site());
+    let opt_ident = Ident::new("Option", Span::call_site());
+    let bool_generic = generate_generic(ty_from_path(path_from_ident(bool_ident.clone())));
+
     move |field| {
         if let syn::Type::Path(ty) = &field.ty {
             let segments = &ty.path.segments;
-            if segments.first().is_some_and(|seg| seg.ident == bool_ident) {
-                bool_fields.push(field.clone());
-                return false;
+            let first_seg = segments.first().expect("field type path has one segment");
+
+            if first_seg.ident == opt_ident && first_seg.arguments == bool_generic {
+                bool_fields.push(BoolField::from_opt_bool_field(field));
+            } else if first_seg.ident == bool_ident {
+                bool_fields.push(BoolField::from_field(field));
+            } else {
+                return true;
             }
+
+            return false;
         }
 
         true
     }
 }
 
-fn extract_bool_fields(flag_field: Field, fields: Fields) -> Result<(Fields, Vec<Field>), Error> {
+fn extract_bool_fields(
+    flag_field: Field,
+    fields: Fields,
+) -> Result<(Fields, Vec<BoolField>), Error> {
     let Fields::Named(mut fields) = fields else {
         return Err(Error::Custom(
             Span::call_site(),
@@ -112,17 +184,15 @@ fn get_flag_size(bool_count: usize) -> Result<syn::Type, Error> {
 fn generate_bitflags_type(
     flags_name: &Ident,
     flags_size: syn::Type,
-    bool_fields: &[Field],
+    bool_fields: &[BoolField],
     flags_derives: Vec<TokenStream>,
 ) -> TokenStream {
-    let flag_values = (0..bool_fields.len())
+    let opt_bools = bool_fields.iter().filter_map(|f| f.tag_bit_flag_ident());
+    let flag_values = (0..(bool_fields.len() + opt_bools.clone().count()))
         .map(|i| (1 << i).to_string())
         .map(|i| syn::LitInt::new(&i, Span::call_site()));
 
-    let flag_names = bool_fields
-        .iter()
-        .map(|f| f.ident.as_ref().unwrap())
-        .map(field_to_flag_name);
+    let flag_names = bool_fields.iter().map(|f| &f.flag_ident).chain(opt_bools);
 
     #[cfg(feature = "typesize")]
     let typesize_impl = Some(quote!(impl ::typesize::TypeSize for #flags_name {}));
