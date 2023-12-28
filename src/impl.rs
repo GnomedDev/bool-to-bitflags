@@ -62,7 +62,7 @@ fn extract_bool_fields(flag_field: Field, fields: Fields) -> Result<(Fields, Vec
     let Fields::Named(mut fields) = fields else {
         return Err(Error::Custom(
             Span::call_site(),
-            "Only structs with named fields are supported!",
+            "bool_to_bitflags: Only structs with named fields are supported!",
         ));
     };
 

@@ -1,6 +1,6 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
-use syn::{punctuated::Punctuated, ItemStruct, Path, Token};
+use syn::{punctuated::Punctuated, spanned::Spanned, ItemStruct, Path, Token};
 
 use crate::error::Error;
 
@@ -34,6 +34,13 @@ fn set_custom_impls(
         };
 
         if first_segment != &serde_segment && first_segment != &typesize_first_segment {
+            if first_segment == &serialize_segment || first_segment == &deserialize_segment {
+                return Err(Error::Custom(
+                    path.span(),
+                    "bool_to_bitflags: Please be specific with this derive path.",
+                ));
+            }
+
             filtered_derives.push(path);
             continue;
         }
