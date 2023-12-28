@@ -2,7 +2,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{punctuated::Punctuated, Field, Fields, FieldsNamed, ItemStruct, Token};
 
-use crate::field_to_flag_name;
+use crate::r#impl::field_to_flag_name;
 
 fn extract_fields(fields: &Fields) -> &Punctuated<Field, Token![,]> {
     if let Fields::Named(FieldsNamed { named, .. }) = fields {

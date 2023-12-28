@@ -1,4 +1,3 @@
-use proc_macro2::{Ident, Span};
 use r#impl::bool_to_bitflags_impl;
 
 mod args;
@@ -8,12 +7,6 @@ mod r#impl;
 mod impl_from_into;
 mod impl_get_set;
 mod strip_spans;
-
-fn field_to_flag_name(ident: &Ident) -> Ident {
-    // Purposefully does not use field ident for flag name, to prevent flag
-    // showing up in documentation/rust-analyzer hints
-    Ident::new(&ident.to_string().to_uppercase(), Span::call_site())
-}
 
 #[proc_macro_attribute]
 pub fn bool_to_bitflags(

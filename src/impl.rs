@@ -8,13 +8,18 @@ use crate::{
     args::Args,
     derive_hijack::{hijack_derives, HijackOutput},
     error::Error,
-    field_to_flag_name,
     impl_from_into::{impl_from, impl_into},
     impl_get_set::generate_getters_setters,
     strip_spans::strip_spans,
 };
 
-fn path_from_ident(ident: Ident) -> syn::Path {
+pub fn field_to_flag_name(ident: &Ident) -> Ident {
+    // Purposefully does not use field ident for flag name, to prevent flag
+    // showing up in documentation/rust-analyzer hints
+    Ident::new(&ident.to_string().to_uppercase(), Span::call_site())
+}
+
+pub fn path_from_ident(ident: Ident) -> syn::Path {
     syn::Path {
         leading_colon: None,
         segments: [syn::PathSegment {
@@ -26,6 +31,15 @@ fn path_from_ident(ident: Ident) -> syn::Path {
     }
 }
 
+pub fn generate_pub_crate() -> syn::Visibility {
+    syn::Visibility::Restricted(syn::VisRestricted {
+        pub_token: <syn::Token![pub]>::default(),
+        paren_token: syn::token::Paren::default(),
+        in_token: None,
+        path: Box::new(path_from_ident(Ident::new("crate", Span::call_site()))),
+    })
+}
+
 fn ty_from_path(path: syn::Path) -> syn::Type {
     syn::Type::Path(syn::TypePath { qself: None, path })
 }
@@ -34,12 +48,7 @@ fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
     Field {
         attrs: Vec::new(),
         ident: Some(field_ident),
-        vis: syn::Visibility::Restricted(syn::VisRestricted {
-            pub_token: <Token![pub]>::default(),
-            paren_token: syn::token::Paren::default(),
-            in_token: None,
-            path: Box::new(path_from_ident(Ident::new("crate", Span::call_site()))),
-        }),
+        vis: generate_pub_crate(),
         mutability: syn::FieldMutability::None,
         colon_token: Some(<Token![:]>::default()),
         ty: ty_from_path(path_from_ident(flags_ident)),

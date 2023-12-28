@@ -1,19 +1,24 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::Field;
 
-use crate::{args::Args, field_to_flag_name};
+use crate::{
+    args::Args,
+    r#impl::{field_to_flag_name, generate_pub_crate},
+};
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
     let attrs = attrs.iter().filter(|attr| attr.path().is_ident("doc"));
     quote!(#(#attrs)*)
 }
 
-fn handle_visibility_arg(field_vis: &syn::Visibility, private: bool) -> &syn::Visibility {
+fn handle_visibility_arg(field_vis: &syn::Visibility, private: bool) -> Cow<'_, syn::Visibility> {
     if private {
-        &syn::Visibility::Inherited
+        Cow::Owned(generate_pub_crate())
     } else {
-        field_vis
+        Cow::Borrowed(field_vis)
     }
 }
 
