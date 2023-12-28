@@ -1,9 +1,11 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Span, TokenStream};
 
 pub enum Error {
     Syn(syn::Error),
     Darling(darling::Error),
-    Custom(Span, &'static str),
+    Custom(Span, Cow<'static, str>),
 }
 
 impl Error {

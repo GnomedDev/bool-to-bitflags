@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{punctuated::Punctuated, spanned::Spanned, ItemStruct, Path, Token};
@@ -37,7 +39,7 @@ fn set_custom_impls(
             if first_segment == &serialize_segment || first_segment == &deserialize_segment {
                 return Err(Error::Custom(
                     path.span(),
-                    "bool_to_bitflags: Please be specific with this derive path.",
+                    Cow::Borrowed("bool_to_bitflags: Please be specific with this derive path."),
                 ));
             }
 

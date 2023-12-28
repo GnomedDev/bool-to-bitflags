@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{Field, Fields, Ident, Token};
@@ -24,6 +26,10 @@ fn path_from_ident(ident: Ident) -> syn::Path {
     }
 }
 
+fn ty_from_path(path: syn::Path) -> syn::Type {
+    syn::Type::Path(syn::TypePath { qself: None, path })
+}
+
 fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
     Field {
         attrs: Vec::new(),
@@ -36,10 +42,7 @@ fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
         }),
         mutability: syn::FieldMutability::None,
         colon_token: Some(<Token![:]>::default()),
-        ty: syn::Type::Path(syn::TypePath {
-            qself: None,
-            path: path_from_ident(flags_ident),
-        }),
+        ty: ty_from_path(path_from_ident(flags_ident)),
     }
 }
 
@@ -62,7 +65,7 @@ fn extract_bool_fields(flag_field: Field, fields: Fields) -> Result<(Fields, Vec
     let Fields::Named(mut fields) = fields else {
         return Err(Error::Custom(
             Span::call_site(),
-            "bool_to_bitflags: Only structs with named fields are supported!",
+            Cow::Borrowed("bool_to_bitflags: Only structs with named fields are supported!"),
         ));
     };
 
@@ -77,23 +80,32 @@ fn extract_bool_fields(flag_field: Field, fields: Fields) -> Result<(Fields, Vec
     Ok((Fields::Named(fields), bool_fields))
 }
 
-fn get_flag_size(bool_count: usize) -> TokenStream {
-    match bool_count {
-        0..=8 => quote!(u8),
-        9..=16 => quote!(u16),
-        17..=32 => quote!(u32),
-        33..=64 => quote!(u64),
-        65..=128 => quote!(u128),
-        _ => panic!("Cannot fit {bool_count} bool fields into single bitflags type!"),
-    }
+fn get_flag_size(bool_count: usize) -> Result<syn::Type, Error> {
+    let ty_name = match bool_count {
+        0..=8 => "u8",
+        9..=16 => "u16",
+        17..=32 => "u32",
+        33..=64 => "u64",
+        65..=128 => "u128",
+        _ => {
+            let err_msg = format!(
+                "bool_to_bitflags: Cannot fit {bool_count} bool fields into single bitflags type!"
+            );
+
+            return Err(Error::Custom(Span::call_site(), Cow::Owned(err_msg)));
+        }
+    };
+
+    let ident = Ident::new(ty_name, Span::call_site());
+    Ok(ty_from_path(path_from_ident(ident)))
 }
 
 fn generate_bitflags_type(
     flags_name: &Ident,
+    flags_size: syn::Type,
     bool_fields: &[Field],
     flags_derives: Vec<TokenStream>,
 ) -> TokenStream {
-    let flags_size = get_flag_size(bool_fields.len());
     let flag_values = (0..bool_fields.len())
         .map(|i| (1 << i).to_string())
         .map(|i| syn::LitInt::new(&i, Span::call_site()));
@@ -163,7 +175,8 @@ pub fn bool_to_bitflags_impl(
         &bool_fields,
     );
 
-    let bitflags_def = generate_bitflags_type(&flags_name, &bool_fields, flags_derives);
+    let flags_size = get_flag_size(bool_fields.len())?;
+    let bitflags_def = generate_bitflags_type(&flags_name, flags_size, &bool_fields, flags_derives);
     let func_impls = generate_getters_setters(
         &struct_item,
         flags_name,
