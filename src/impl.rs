@@ -12,24 +12,33 @@ use crate::{
     strip_spans::strip_spans,
 };
 
+fn path_from_ident(ident: Ident) -> syn::Path {
+    syn::Path {
+        leading_colon: None,
+        segments: [syn::PathSegment {
+            ident,
+            arguments: syn::PathArguments::None,
+        }]
+        .into_iter()
+        .collect(),
+    }
+}
+
 fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
     Field {
         attrs: Vec::new(),
         ident: Some(field_ident),
-        vis: syn::Visibility::Inherited,
+        vis: syn::Visibility::Restricted(syn::VisRestricted {
+            pub_token: <Token![pub]>::default(),
+            paren_token: syn::token::Paren::default(),
+            in_token: None,
+            path: Box::new(path_from_ident(Ident::new("crate", Span::call_site()))),
+        }),
         mutability: syn::FieldMutability::None,
         colon_token: Some(<Token![:]>::default()),
         ty: syn::Type::Path(syn::TypePath {
             qself: None,
-            path: syn::Path {
-                leading_colon: None,
-                segments: [syn::PathSegment {
-                    ident: flags_ident,
-                    arguments: syn::PathArguments::None,
-                }]
-                .into_iter()
-                .collect(),
-            },
+            path: path_from_ident(flags_ident),
         }),
     }
 }
@@ -102,7 +111,7 @@ fn generate_bitflags_type(
     quote!(
         bitflags::bitflags! {
             #(#flags_derives)*
-            struct #flags_name: #flags_size {
+            pub(crate) struct #flags_name: #flags_size {
                 #(const #flag_names = #flag_values;)*
             }
         }
