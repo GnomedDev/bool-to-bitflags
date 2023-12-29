@@ -2,7 +2,10 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::{punctuated::Punctuated, Field, Fields, FieldsNamed, ItemStruct, Token};
 
-use crate::{impl_get_set::generate_getter_body, r#impl::BoolField};
+use crate::{
+    impl_get_set::generate_getter_body,
+    r#impl::{filter_doc_fields, BoolField},
+};
 
 fn extract_fields(fields: &Fields) -> &Punctuated<Field, Token![,]> {
     if let Fields::Named(FieldsNamed { named, .. }) = fields {
@@ -25,6 +28,7 @@ pub fn impl_from(
     let fields = extract_fields(&struct_item.fields);
     let passthrough_fields = fields
         .iter()
+        .filter(filter_doc_fields)
         .filter_map(|f| f.ident.as_ref())
         .filter(|ident| *ident != flag_field_name)
         .map(|ident| quote!(#ident: value.#ident));
@@ -73,6 +77,7 @@ pub fn impl_into(
     let fields = extract_fields(&struct_item.fields);
     let passthrough_fields = fields
         .iter()
+        .filter(filter_doc_fields)
         .filter_map(|f| f.ident.as_ref())
         .filter(|ident| *ident != flag_field_name)
         .map(|ident| quote!(#ident: self.#ident));

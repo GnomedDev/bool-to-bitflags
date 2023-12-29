@@ -115,7 +115,64 @@ fn generate_generic(ty: syn::Type) -> syn::PathArguments {
     })
 }
 
-fn is_bool_field(bool_fields: &mut Vec<BoolField>) -> impl FnMut(&Field) -> bool + '_ {
+fn generate_doc_attr(value: &str) -> syn::Attribute {
+    syn::Attribute {
+        pound_token: <Token![#]>::default(),
+        style: syn::AttrStyle::Outer,
+        bracket_token: syn::token::Bracket::default(),
+        meta: syn::Meta::NameValue(syn::MetaNameValue {
+            path: path_from_ident(Ident::new("doc", Span::call_site())),
+            eq_token: <Token![=]>::default(),
+            value: syn::Expr::Lit(syn::ExprLit {
+                attrs: Vec::new(),
+                lit: syn::Lit::Str(syn::LitStr::new(value, Span::call_site())),
+            }),
+        }),
+    }
+}
+
+pub fn generate_unit_type() -> syn::Type {
+    syn::Type::Tuple(syn::TypeTuple {
+        paren_token: syn::token::Paren::default(),
+        elems: syn::punctuated::Punctuated::new(),
+    })
+}
+
+const FIELD_DOCUMENTATION: &str = "Use the matching getters and setters for this field";
+pub fn filter_doc_fields(field: &&Field) -> bool {
+    field.attrs != vec![generate_doc_attr(FIELD_DOCUMENTATION)]
+}
+
+enum MaybeFakeField {
+    Fake(Option<Ident>),
+    Real(Field),
+}
+
+impl MaybeFakeField {
+    fn into_field(self) -> Field {
+        match self {
+            Self::Real(inner) => inner,
+            Self::Fake(ident) => Field {
+                attrs: vec![generate_doc_attr(FIELD_DOCUMENTATION)],
+                vis: syn::Visibility::Public(<Token![pub]>::default()),
+                mutability: syn::FieldMutability::None,
+                ident,
+                colon_token: Some(<Token![:]>::default()),
+                ty: generate_unit_type(),
+            },
+        }
+    }
+
+    fn into_real(self) -> Option<Field> {
+        if let Self::Real(inner) = self {
+            Some(inner)
+        } else {
+            None
+        }
+    }
+}
+
+fn is_bool_field(bool_fields: &mut Vec<BoolField>) -> impl FnMut(Field) -> MaybeFakeField + '_ {
     let bool_ident = Ident::new("bool", Span::call_site());
     let opt_ident = Ident::new("Option", Span::call_site());
     let bool_generic = generate_generic(ty_from_ident(bool_ident.clone()));
@@ -126,21 +183,22 @@ fn is_bool_field(bool_fields: &mut Vec<BoolField>) -> impl FnMut(&Field) -> bool
             let first_seg = segments.first().expect("field type path has one segment");
 
             if first_seg.ident == opt_ident && first_seg.arguments == bool_generic {
-                bool_fields.push(BoolField::from_opt_bool_field(field));
+                bool_fields.push(BoolField::from_opt_bool_field(&field));
             } else if first_seg.ident == bool_ident {
-                bool_fields.push(BoolField::from_field(field));
+                bool_fields.push(BoolField::from_field(&field));
             } else {
-                return true;
+                return MaybeFakeField::Real(field);
             }
 
-            return false;
+            MaybeFakeField::Fake(field.ident)
+        } else {
+            MaybeFakeField::Real(field)
         }
-
-        true
     }
 }
 
 fn extract_bool_fields(
+    args: &Args,
     flag_field: Field,
     fields: Fields,
 ) -> Result<(Fields, Vec<BoolField>), Error> {
@@ -152,12 +210,15 @@ fn extract_bool_fields(
     };
 
     let mut bool_fields = Vec::new();
-    fields.named = fields
-        .named
-        .into_iter()
-        .filter(is_bool_field(&mut bool_fields))
-        .chain(std::iter::once(flag_field))
-        .collect();
+    let field_iter = fields.named.into_iter().chain(std::iter::once(flag_field));
+
+    fields.named = if args.documentation_fields {
+        let mut mapper = is_bool_field(&mut bool_fields);
+        field_iter.map(|f| mapper(f).into_field()).collect()
+    } else {
+        let mut mapper = is_bool_field(&mut bool_fields);
+        field_iter.filter_map(|f| mapper(f).into_real()).collect()
+    };
 
     Ok((Fields::Named(fields), bool_fields))
 }
@@ -230,7 +291,7 @@ pub fn bool_to_bitflags_impl(
     strip_spans(&mut original_struct);
 
     let flag_field = generate_flag_field(flags_name.clone(), flag_field_name.clone());
-    let (fields, bool_fields) = extract_bool_fields(flag_field, struct_item.fields)?;
+    let (fields, bool_fields) = extract_bool_fields(&args, flag_field, struct_item.fields)?;
     struct_item.fields = fields;
 
     let HijackOutput {

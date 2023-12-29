@@ -5,7 +5,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     args::Args,
-    r#impl::{generate_pub_crate, ty_from_ident, BoolField},
+    r#impl::{generate_pub_crate, generate_unit_type, ty_from_ident, BoolField},
 };
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
@@ -27,11 +27,7 @@ fn handle_owning_setters(owning_setters: bool) -> (TokenStream, syn::Type, Optio
         let owned_self_ty = ty_from_ident(Ident::new("Self", Span::call_site()));
         (quote!(mut self), owned_self_ty, Some(self_ident))
     } else {
-        let unit_ret = syn::Type::Tuple(syn::TypeTuple {
-            paren_token: syn::token::Paren::default(),
-            elems: syn::punctuated::Punctuated::new(),
-        });
-
+        let unit_ret = generate_unit_type();
         (quote!(&mut self), unit_ret, None)
     }
 }
