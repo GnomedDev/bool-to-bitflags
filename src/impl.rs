@@ -90,7 +90,7 @@ pub fn generate_pub_crate() -> syn::Visibility {
     })
 }
 
-fn ty_from_path(path: syn::Path) -> syn::Type {
+pub fn ty_from_path(path: syn::Path) -> syn::Type {
     syn::Type::Path(syn::TypePath { qself: None, path })
 }
 

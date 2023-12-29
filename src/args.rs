@@ -14,6 +14,8 @@ pub struct Args {
     pub private_setters: bool,
     #[darling(default)]
     pub document_setters: bool,
+    #[darling(default)]
+    pub owning_setters: bool,
 }
 
 impl Args {

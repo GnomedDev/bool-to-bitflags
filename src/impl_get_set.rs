@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, Span, TokenStream};
 use quote::{format_ident, quote};
 
 use crate::{
     args::Args,
-    r#impl::{generate_pub_crate, BoolField},
+    r#impl::{generate_pub_crate, path_from_ident, ty_from_path, BoolField},
 };
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
@@ -18,6 +18,21 @@ fn handle_visibility_arg(field_vis: &syn::Visibility, private: bool) -> Cow<'_, 
         Cow::Owned(generate_pub_crate())
     } else {
         Cow::Borrowed(field_vis)
+    }
+}
+
+fn handle_owning_setters(owning_setters: bool) -> (TokenStream, syn::Type, Option<Ident>) {
+    let self_ident = Ident::new("self", Span::call_site());
+    if owning_setters {
+        let owned_self_ty = ty_from_path(path_from_ident(Ident::new("Self", Span::call_site())));
+        (quote!(mut self), owned_self_ty, Some(self_ident))
+    } else {
+        let unit_ret = syn::Type::Tuple(syn::TypeTuple {
+            paren_token: syn::token::Paren::default(),
+            elems: syn::punctuated::Punctuated::new(),
+        });
+
+        (quote!(&mut self), unit_ret, None)
     }
 }
 
@@ -70,6 +85,8 @@ pub fn generate_getters_setters(
 
         let getter_vis = handle_visibility_arg(&field.vis, args.private_getters);
         let setter_vis = handle_visibility_arg(&field.vis, args.private_setters);
+        let (setter_self_ty, setter_ret_ty, setter_ret) =
+            handle_owning_setters(args.owning_setters);
 
         let (getter_name, setter_name) = args_to_names(&args, field_name);
         let (getter_docs, setter_docs) = if args.document_setters {
@@ -88,8 +105,9 @@ pub fn generate_getters_setters(
                 }
 
                 #setter_docs
-                #setter_vis fn #setter_name(&mut self, value: bool) {
+                #setter_vis fn #setter_name(#setter_self_ty, value: bool) -> #setter_ret_ty {
                     self.#flag_field.set(#flags_name::#flag_name, value);
+                    #setter_ret
                 }
             ),
             BoolField::Opt {
@@ -101,13 +119,14 @@ pub fn generate_getters_setters(
                 }
 
                 #setter_docs
-                #setter_vis fn #setter_name(&mut self, value: Option<bool>) {
+                #setter_vis fn #setter_name(#setter_self_ty, value: Option<bool>) -> #setter_ret_ty {
                     if let Some(value) = value {
                         self.#flag_field.insert(#flags_name::#tag_bit_flag_ident);
                         self.#flag_field.set(#flags_name::#flag_name, value);
                     } else {
                         self.#flag_field.remove(#flags_name::#tag_bit_flag_ident);
-                    }
+                    };
+                    #setter_ret
                 }
             ),
         };
