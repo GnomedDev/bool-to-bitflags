@@ -5,7 +5,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     args::Args,
-    r#impl::{generate_pub_crate, path_from_ident, ty_from_path, BoolField},
+    r#impl::{generate_pub_crate, ty_from_ident, BoolField},
 };
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
@@ -24,7 +24,7 @@ fn handle_visibility_arg(field_vis: &syn::Visibility, private: bool) -> Cow<'_, 
 fn handle_owning_setters(owning_setters: bool) -> (TokenStream, syn::Type, Option<Ident>) {
     let self_ident = Ident::new("self", Span::call_site());
     if owning_setters {
-        let owned_self_ty = ty_from_path(path_from_ident(Ident::new("Self", Span::call_site())));
+        let owned_self_ty = ty_from_ident(Ident::new("Self", Span::call_site()));
         (quote!(mut self), owned_self_ty, Some(self_ident))
     } else {
         let unit_ret = syn::Type::Tuple(syn::TypeTuple {

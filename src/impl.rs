@@ -69,7 +69,7 @@ impl std::ops::Deref for BoolField {
     }
 }
 
-pub fn path_from_ident(ident: Ident) -> syn::Path {
+fn path_from_ident(ident: Ident) -> syn::Path {
     syn::Path {
         leading_colon: None,
         segments: [syn::PathSegment {
@@ -83,14 +83,15 @@ pub fn path_from_ident(ident: Ident) -> syn::Path {
 
 pub fn generate_pub_crate() -> syn::Visibility {
     syn::Visibility::Restricted(syn::VisRestricted {
-        pub_token: <syn::Token![pub]>::default(),
+        pub_token: <Token![pub]>::default(),
         paren_token: syn::token::Paren::default(),
         in_token: None,
         path: Box::new(path_from_ident(Ident::new("crate", Span::call_site()))),
     })
 }
 
-pub fn ty_from_path(path: syn::Path) -> syn::Type {
+pub fn ty_from_ident(ident: syn::Ident) -> syn::Type {
+    let path = path_from_ident(ident);
     syn::Type::Path(syn::TypePath { qself: None, path })
 }
 
@@ -101,7 +102,7 @@ fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
         vis: generate_pub_crate(),
         mutability: syn::FieldMutability::None,
         colon_token: Some(<Token![:]>::default()),
-        ty: ty_from_path(path_from_ident(flags_ident)),
+        ty: ty_from_ident(flags_ident),
     }
 }
 
@@ -117,7 +118,7 @@ fn generate_generic(ty: syn::Type) -> syn::PathArguments {
 fn is_bool_field(bool_fields: &mut Vec<BoolField>) -> impl FnMut(&Field) -> bool + '_ {
     let bool_ident = Ident::new("bool", Span::call_site());
     let opt_ident = Ident::new("Option", Span::call_site());
-    let bool_generic = generate_generic(ty_from_path(path_from_ident(bool_ident.clone())));
+    let bool_generic = generate_generic(ty_from_ident(bool_ident.clone()));
 
     move |field| {
         if let syn::Type::Path(ty) = &field.ty {
@@ -177,8 +178,7 @@ fn get_flag_size(bool_count: usize) -> Result<syn::Type, Error> {
         }
     };
 
-    let ident = Ident::new(ty_name, Span::call_site());
-    Ok(ty_from_path(path_from_ident(ident)))
+    Ok(ty_from_ident(Ident::new(ty_name, Span::call_site())))
 }
 
 fn generate_bitflags_type(
