@@ -4,6 +4,7 @@ use proc_macro2::TokenStream;
 
 use crate::error::Error;
 
+/// Match documentation to crate level docs!!
 #[derive(darling::FromMeta)]
 pub struct Args {
     pub getter_prefix: Option<String>,
