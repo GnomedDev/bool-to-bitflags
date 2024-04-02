@@ -3,7 +3,7 @@ name = "bool_to_bitflags"
 description = "A library to compact multiple bools into a single bitflags field automatically with getters and setters."
 repository = "https://github.com/GnomedDev/bool-to-bitflags"
 rust-version = "1.65"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT"
 
