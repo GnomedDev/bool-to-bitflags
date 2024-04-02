@@ -16,6 +16,11 @@
 //! | `private_setters`  | `bool`   | Field Visibility   | If true, setters are forced to be crate-private                              |
 //! | `document_setters` | `bool`   | `false`            | If true, field documentation is used for setters, instead of getters         |
 //! | `owning_setters`   | `bool`   | `false`            | If true, setters take `self` and return `self` instead of taking `&mut self` |
+//!
+//! ## MSRV
+//! The Minimum Supported Rust Version of this crate is 1.65.
+//!
+//! It is considered a breaking change to raise this requirement.
 use r#impl::bool_to_bitflags_impl;
 
 mod args;
