@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{Attribute, Field, Fields, Ident, Token};
+use to_arraystring::ToArrayString;
 
 use crate::{
     args::Args,
@@ -207,8 +208,8 @@ fn generate_bitflags_type(
 ) -> TokenStream {
     let opt_bools = bool_fields.iter().filter_map(|f| f.tag_bit_flag_ident());
     let flag_values = (0..(bool_fields.len() + opt_bools.clone().count()))
-        .map(|i| (1 << i).to_string())
-        .map(|i| syn::LitInt::new(&i, Span::call_site()));
+        .map(|i| (1_u128 << i).to_arraystring())
+        .map(|i| syn::LitInt::new(i.as_str(), Span::call_site()));
 
     let flag_names = bool_fields.iter().map(|f| &f.flag_ident).chain(opt_bools);
     let flag_cfgs = {
