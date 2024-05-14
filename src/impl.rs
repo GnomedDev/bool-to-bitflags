@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
-use syn::{Field, Fields, Ident, Token};
+use syn::{Attribute, Field, Fields, Ident, Token};
 
 use crate::{
     args::Args,
@@ -93,6 +93,24 @@ pub fn generate_pub_crate() -> syn::Visibility {
 pub fn ty_from_ident(ident: syn::Ident) -> syn::Type {
     let path = path_from_ident(ident);
     syn::Type::Path(syn::TypePath { qself: None, path })
+}
+
+pub fn extract_cfgs(attrs: &[Attribute]) -> impl Iterator<Item = &Attribute> + Clone {
+    attrs.iter().filter(|attr| {
+        if attr.style != syn::AttrStyle::Outer {
+            return false;
+        }
+
+        let syn::Meta::List(meta_list) = &attr.meta else {
+            return false;
+        };
+
+        let Some(ident) = meta_list.path.get_ident() else {
+            return false;
+        };
+
+        ident == "cfg"
+    })
 }
 
 fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
@@ -193,6 +211,21 @@ fn generate_bitflags_type(
         .map(|i| syn::LitInt::new(&i, Span::call_site()));
 
     let flag_names = bool_fields.iter().map(|f| &f.flag_ident).chain(opt_bools);
+    let flag_cfgs = {
+        let field_tag_cfgs = bool_fields.iter().map(|f| {
+            let field_cfgs = extract_cfgs(&f.attrs);
+            let tag_cfgs = if matches!(f, BoolField::Opt { .. }) {
+                extract_cfgs(&f.attrs)
+            } else {
+                extract_cfgs(&[])
+            };
+
+            (quote!(#(#field_cfgs)*), quote!(#(#tag_cfgs)*))
+        });
+
+        let (field_cfgs, tag_cfgs): (Vec<_>, Vec<_>) = field_tag_cfgs.unzip();
+        field_cfgs.into_iter().chain(tag_cfgs)
+    };
 
     #[cfg(feature = "typesize")]
     let typesize_impl = Some(quote!(impl ::typesize::TypeSize for #flags_name {}));
@@ -203,7 +236,7 @@ fn generate_bitflags_type(
         bitflags::bitflags! {
             #(#flags_derives)*
             pub(crate) struct #flags_name: #flags_size {
-                #(const #flag_names = #flag_values;)*
+                #(#flag_cfgs const #flag_names = #flag_values;)*
             }
         }
 

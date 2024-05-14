@@ -5,7 +5,7 @@ use quote::{format_ident, quote};
 
 use crate::{
     args::Args,
-    r#impl::{generate_pub_crate, ty_from_ident, BoolField},
+    r#impl::{extract_cfgs, generate_pub_crate, ty_from_ident, BoolField},
 };
 
 fn extract_docs(attrs: &[syn::Attribute]) -> TokenStream {
@@ -79,6 +79,9 @@ pub fn generate_getters_setters(
 
     let mut impl_body = TokenStream::new();
     for field in bool_fields {
+        let field_cfgs = extract_cfgs(&field.attrs);
+        let field_cfgs_clone = field_cfgs.clone();
+
         let field_docs = extract_docs(&field.attrs);
         let field_name = &field.field_ident;
         let flag_name = &field.flag_ident;
@@ -100,11 +103,13 @@ pub fn generate_getters_setters(
         let to_extend = match field {
             BoolField::Normal(_) => quote!(
                 #getter_docs
+                #(#field_cfgs)*
                 #getter_vis fn #getter_name(&self) -> bool {
                     #getter_body
                 }
 
                 #setter_docs
+                #(#field_cfgs_clone)*
                 #setter_vis fn #setter_name(#setter_self_ty, value: bool) -> #setter_ret_ty {
                     self.#flag_field.set(#flags_name::#flag_name, value);
                     #setter_ret
@@ -114,11 +119,13 @@ pub fn generate_getters_setters(
                 tag_bit_flag_ident, ..
             } => quote!(
                 #getter_docs
+                #(#field_cfgs)*
                 #getter_vis fn #getter_name(&self) -> Option<bool> {
                     #getter_body
                 }
 
                 #setter_docs
+                #(#field_cfgs_clone)*
                 #setter_vis fn #setter_name(#setter_self_ty, value: Option<bool>) -> #setter_ret_ty {
                     if let Some(value) = value {
                         self.#flag_field.insert(#flags_name::#tag_bit_flag_ident);
