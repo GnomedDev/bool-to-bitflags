@@ -308,9 +308,9 @@ dependencies = [
 
 [[package]]
 name = "to-arraystring"
-version = "0.1.3"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "340b46242bcb0b5c24768ca5901c51f0b3439ed88d04e8870f83826b960760b4"
+checksum = "65f0cb560353f425f2258dd9a5159441ac9c47ef7f87e5ab6836a7b1f04ef71d"
 dependencies = [
  "arrayvec",
  "itoa",
