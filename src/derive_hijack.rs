@@ -29,7 +29,7 @@ fn set_custom_impls(
     let typesize_last_segment = new_basic_segment("TypeSize");
 
     let mut filtered_derives = Vec::new();
-    for path in &derive_macros {
+    for path in derive_macros {
         let mut path_iter = path.segments.iter();
         let Some(first_segment) = path_iter.next() else {
             continue;

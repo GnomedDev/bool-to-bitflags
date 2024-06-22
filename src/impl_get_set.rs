@@ -69,10 +69,10 @@ pub fn generate_getter_body(
 
 pub fn generate_getters_setters(
     struct_item: &syn::ItemStruct,
-    flags_name: Ident,
-    flag_field: Ident,
+    flags_name: &Ident,
+    flag_field: &Ident,
     bool_fields: &[BoolField],
-    args: Args,
+    args: &Args,
 ) -> TokenStream {
     let struct_name = &struct_item.ident;
     let (impl_generics, ty_generics, where_clause) = struct_item.generics.split_for_impl();
@@ -91,7 +91,7 @@ pub fn generate_getters_setters(
         let (setter_self_ty, setter_ret_ty, setter_ret) =
             handle_owning_setters(args.owning_setters);
 
-        let (getter_name, setter_name) = args_to_names(&args, field_name);
+        let (getter_name, setter_name) = args_to_names(args, field_name);
         let (getter_docs, setter_docs) = if args.document_setters {
             (TokenStream::default(), field_docs)
         } else {
@@ -99,7 +99,7 @@ pub fn generate_getters_setters(
             (field_docs, quote!(#[doc = #setter_docs]))
         };
 
-        let getter_body = generate_getter_body(field, &flag_field, &flags_name);
+        let getter_body = generate_getter_body(field, flag_field, flags_name);
         let to_extend = match field {
             BoolField::Normal(_) => quote!(
                 #getter_docs
@@ -138,7 +138,7 @@ pub fn generate_getters_setters(
             ),
         };
 
-        impl_body.extend([to_extend])
+        impl_body.extend([to_extend]);
     }
 
     quote!(

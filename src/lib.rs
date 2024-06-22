@@ -21,7 +21,8 @@
 //! The Minimum Supported Rust Version of this crate is 1.65.
 //!
 //! It is considered a breaking change to raise this requirement.
-use r#impl::bool_to_bitflags_impl;
+#![warn(clippy::pedantic, rust_2018_idioms)]
+#![allow(clippy::similar_names)]
 
 mod args;
 mod derive_hijack;
@@ -38,7 +39,7 @@ pub fn bool_to_bitflags(
     item: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     let struct_item = syn::parse_macro_input!(item as syn::ItemStruct);
-    match bool_to_bitflags_impl(args.into(), struct_item) {
+    match r#impl::bool_to_bitflags(args.into(), struct_item) {
         Ok(output) => {
             #[cfg(feature = "procout")]
             procout::procout(&output, None, Some("output"));

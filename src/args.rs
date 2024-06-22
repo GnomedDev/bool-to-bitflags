@@ -1,3 +1,4 @@
+#![allow(clippy::manual_unwrap_or_default)] // Emitted inside darling's code
 use darling::ast::NestedMeta;
 use darling::FromMeta;
 use proc_macro2::TokenStream;
@@ -6,6 +7,7 @@ use crate::error::Error;
 
 /// Match documentation to crate level docs!!
 #[derive(darling::FromMeta)]
+#[allow(clippy::struct_excessive_bools)] // I would love to use bool_to_bitflags here... but
 pub struct Args {
     pub getter_prefix: Option<String>,
     pub setter_prefix: Option<String>,

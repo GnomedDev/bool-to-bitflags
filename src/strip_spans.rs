@@ -14,7 +14,7 @@ pub fn strip_spans(struct_item: &mut ItemStruct) {
 
     for field in &mut struct_item.fields {
         if let Some(ident) = &mut field.ident {
-            ident.set_span(Span::call_site())
+            ident.set_span(Span::call_site());
         }
     }
 }

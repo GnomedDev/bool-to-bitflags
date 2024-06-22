@@ -202,9 +202,9 @@ fn get_flag_size(bool_count: usize) -> Result<syn::Type, Error> {
 
 fn generate_bitflags_type(
     flags_name: &Ident,
-    flags_size: syn::Type,
+    flags_size: &syn::Type,
     bool_fields: &[BoolField],
-    flags_derives: Vec<TokenStream>,
+    flags_derives: &[TokenStream],
 ) -> TokenStream {
     let opt_bools = bool_fields.iter().filter_map(|f| f.tag_bit_flag_ident());
     let flag_values = (0..(bool_fields.len() + opt_bools.clone().count()))
@@ -245,7 +245,7 @@ fn generate_bitflags_type(
     )
 }
 
-pub fn bool_to_bitflags_impl(
+pub fn bool_to_bitflags(
     args: TokenStream,
     mut struct_item: syn::ItemStruct,
 ) -> Result<TokenStream, Error> {
@@ -289,13 +289,14 @@ pub fn bool_to_bitflags_impl(
     );
 
     let flags_size = get_flag_size(bool_fields.len())?;
-    let bitflags_def = generate_bitflags_type(&flags_name, flags_size, &bool_fields, flags_derives);
+    let bitflags_def =
+        generate_bitflags_type(&flags_name, &flags_size, &bool_fields, &flags_derives);
     let func_impls = generate_getters_setters(
         &struct_item,
-        flags_name,
-        flag_field_name,
+        &flags_name,
+        &flag_field_name,
         &bool_fields,
-        args,
+        &args,
     );
 
     Ok(quote!(
