@@ -18,7 +18,7 @@
 //! | `owning_setters`   | `bool`   | `false`            | If true, setters take `self` and return `self` instead of taking `&mut self` |
 //!
 //! ## MSRV
-//! The Minimum Supported Rust Version of this crate is 1.65.
+//! The Minimum Supported Rust Version of this crate is 1.88.
 //!
 //! It is considered a breaking change to raise this requirement.
 #![warn(clippy::pedantic, rust_2018_idioms)]

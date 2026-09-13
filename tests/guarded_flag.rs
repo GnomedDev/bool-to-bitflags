@@ -1,10 +1,10 @@
 #[bool_to_bitflags::bool_to_bitflags]
 #[derive(PartialEq, Debug)]
 struct Test {
-    #[cfg(False)]
+    #[cfg(false)]
     disabled_field: u8,
     enabled_field: u8,
-    #[cfg(False)]
+    #[cfg(false)]
     disabled_flag: bool,
     enabled_flag: bool,
 }

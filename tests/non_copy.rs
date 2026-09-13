@@ -1,3 +1,5 @@
+#![expect(dead_code)]
+
 #[derive(Clone, serde::Serialize)]
 struct NonCopy {}
 
