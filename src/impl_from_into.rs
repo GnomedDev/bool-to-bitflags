@@ -1,10 +1,10 @@
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use syn::{punctuated::Punctuated, Attribute, Field, Fields, FieldsNamed, ItemStruct, Token};
+use syn::{Attribute, Field, Fields, FieldsNamed, ItemStruct, Token, punctuated::Punctuated};
 
 use crate::{
+    r#impl::{BoolField, extract_cfgs},
     impl_get_set::generate_getter_body,
-    r#impl::{extract_cfgs, BoolField},
 };
 
 fn extract_fields(fields: &Fields) -> &Punctuated<Field, Token![,]> {

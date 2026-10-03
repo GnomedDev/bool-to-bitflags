@@ -7,7 +7,7 @@ use to_arraystring::ToArrayString;
 
 use crate::{
     args::Args,
-    derive_hijack::{hijack_derives, HijackOutput},
+    derive_hijack::{HijackOutput, hijack_derives},
     error::Error,
     impl_from_into::{impl_from, impl_into},
     impl_get_set::generate_getters_setters,
@@ -93,7 +93,11 @@ pub fn generate_pub_crate() -> syn::Visibility {
 
 pub fn ty_from_ident(ident: syn::Ident) -> syn::Type {
     let path = path_from_ident(ident);
-    syn::Type::Path(syn::TypePath { qself: None, path })
+    syn::Type::Path(syn::TypePath {
+        attrs: Vec::new(),
+        qself: None,
+        path,
+    })
 }
 
 pub fn extract_cfgs(attrs: &[Attribute]) -> impl Iterator<Item = &Attribute> + Clone {
@@ -119,9 +123,10 @@ fn generate_flag_field(flags_ident: Ident, field_ident: Ident) -> Field {
         attrs: Vec::new(),
         ident: Some(field_ident),
         vis: generate_pub_crate(),
-        mutability: syn::FieldMutability::None,
+        modifiers: syn::FieldModifiers::default(),
         colon_token: Some(<Token![:]>::default()),
         ty: ty_from_ident(flags_ident),
+        default: None,
     }
 }
 
