@@ -1,3 +1,8 @@
+## 0.2.0
+
+- Updated Rust edition to 2024 and MSRV to 1.88.
+- Updated `syn` and `darling` internal dependencies.
+
 ## 0.1.3
 
 - Fixed `clippy::pedantic` lints.

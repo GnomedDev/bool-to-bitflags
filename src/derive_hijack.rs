@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::{quote, ToTokens};
-use syn::{punctuated::Punctuated, spanned::Spanned, ItemStruct, Path, Token};
+use quote::{ToTokens, quote};
+use syn::{ItemStruct, Path, Token, punctuated::Punctuated, spanned::Spanned};
 
 use crate::error::Error;
 

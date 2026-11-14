@@ -1,6 +1,5 @@
-#![allow(clippy::manual_unwrap_or_default)] // Emitted inside darling's code
-use darling::ast::NestedMeta;
 use darling::FromMeta;
+use darling::ast::NestedMeta;
 use proc_macro2::TokenStream;
 
 use crate::error::Error;

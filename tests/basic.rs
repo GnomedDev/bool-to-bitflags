@@ -3,7 +3,7 @@
 struct Human {
     age: u8,
     is_epic: bool,
-    /// Describes if the human is epic
+    /// Describes if the human is cool
     is_cool: bool,
 }
 
